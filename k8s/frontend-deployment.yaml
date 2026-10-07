@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skadi-frontend
+  namespace: skadi
+  labels:
+    app: skadi-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skadi-frontend
+  template:
+    metadata:
+      labels:
+        app: skadi-frontend
+    spec:
+      containers:
+        - name: web
+          image: skadi-frontend:placeholder
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

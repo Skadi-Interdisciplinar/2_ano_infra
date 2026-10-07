@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skadi-backend
+  namespace: skadi
+  labels:
+    app: skadi-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skadi-backend
+  template:
+    metadata:
+      labels:
+        app: skadi-backend
+    spec:
+      containers:
+        - name: api
+          image: skadi-backend:placeholder
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: skadi-backend
+          env:
+            - name: REDIS_URL
+              value: redis://skadi-redis:6379/0
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi

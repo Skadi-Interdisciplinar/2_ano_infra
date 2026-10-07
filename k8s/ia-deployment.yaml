@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skadi-ia
+  namespace: skadi
+  labels:
+    app: skadi-ia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skadi-ia
+  template:
+    metadata:
+      labels:
+        app: skadi-ia
+    spec:
+      containers:
+        - name: ia
+          image: skadi-ia:placeholder
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi

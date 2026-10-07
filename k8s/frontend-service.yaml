@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: skadi-frontend
+  namespace: skadi
+  labels:
+    app: skadi-frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: skadi-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
