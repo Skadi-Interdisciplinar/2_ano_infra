@@ -50,7 +50,7 @@ install_argocd() {
   kubectl apply -f "$ROOT/infra/argocd-application.yaml"
 }
 
-up() {
+ligar() {
   ensure_state_bucket
   terraform_init
   terraform -chdir="$ROOT/terraform" apply -input=false -auto-approve
@@ -58,7 +58,7 @@ up() {
   echo "Infra pronta. O Argo CD observa k8s/ na branch main."
 }
 
-down() {
+desligar() {
   ensure_state_bucket
   terraform_init
   terraform -chdir="$ROOT/terraform" destroy -input=false -auto-approve
