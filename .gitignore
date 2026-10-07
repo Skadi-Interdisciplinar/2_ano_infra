@@ -1,0 +1,13 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*.tfvars
+!*.tfvars.example
+
+artifacts/
+build-context/
+.env
+credentials.env

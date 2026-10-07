@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: skadi
+resources:
+  - namespace.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ia-deployment.yaml
+  - ia-service.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+images:
+  - name: skadi-backend
+    newName: skadi-backend
+    newTag: placeholder
+  - name: skadi-frontend
+    newName: skadi-frontend
+    newTag: placeholder
+  - name: skadi-ia
+    newName: skadi-ia
+    newTag: placeholder

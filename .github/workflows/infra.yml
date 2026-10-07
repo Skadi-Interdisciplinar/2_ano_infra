@@ -1,0 +1,45 @@
+name: Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Ligar ou desligar a infra
+        required: true
+        type: choice
+        options:
+          - ligar
+          - desligar
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Instalar kubectl
+        run: |
+          curl -fsSL -o kubectl "https://dl.k8s.io/release/v1.34.1/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      - name: Instalar Terraform
+        run: |
+          curl -fsSL -o terraform.zip "https://releases.hashicorp.com/terraform/1.10.5/terraform_1.10.5_linux_amd64.zip"
+          unzip -o terraform.zip -d /tmp
+          sudo mv /tmp/terraform /usr/local/bin/terraform
+          terraform version
+
+      - name: Aplicar a acao
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: bash scripts/infra.sh "${{ inputs.action }}"
