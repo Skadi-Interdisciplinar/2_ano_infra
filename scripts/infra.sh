@@ -6,7 +6,7 @@ REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 CLUSTER_NAME="skadi"
 ACTION="${1:-}"
 
-if [[ "$ACTION" != "up" && "$ACTION" != "down" ]]; then
+if [[ "$ACTION" != "ligar" && "$ACTION" != "desligar" ]]; then
   echo "Uso: bash scripts/infra.sh up|down" >&2
   exit 1
 fi
