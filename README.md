@@ -53,7 +53,7 @@ Cadastre estes secrets só no repositório `2_ano_infra`. Não cadastre os mesmo
 | `DB_USERNAME` | Usuário da Aiven, em geral `avnadmin` |
 | `DB_PASSWORD` | Senha da Aiven |
 | `SECURITY_KEY` | Chave que você inventa para assinar o JWT |
-| `EXPIRATION_TIME` | `3600` |
+| `EXPIRATION_TIME` | `1800` |
 
 ## Criar a infra
 
