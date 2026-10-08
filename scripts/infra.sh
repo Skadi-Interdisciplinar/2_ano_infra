@@ -44,7 +44,7 @@ terraform_init() {
 install_argocd() {
   aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION"
   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-  kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
   kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=180s
   kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
   kubectl apply -f "$ROOT/infra/argocd-application.yaml"
