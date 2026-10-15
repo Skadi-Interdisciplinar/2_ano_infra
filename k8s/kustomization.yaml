@@ -12,10 +12,10 @@ resources:
 images:
   - name: skadi-backend
     newName: skadi-backend
-    newTag: placeholder
+    newTag: "20261015144406"
   - name: skadi-frontend
     newName: skadi-frontend
-    newTag: placeholder
+    newTag: "20261015144406"
   - name: skadi-ia
     newName: skadi-ia
-    newTag: placeholder
+    newTag: "20261015144406"
