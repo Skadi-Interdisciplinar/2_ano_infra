@@ -164,7 +164,7 @@ spec:
   hostPID: true
   containers:
     - name: import
-      image: busybox:1.36
+      image: public.ecr.aws/docker/library/busybox:1.36
       command: ["sleep", "600"]
       securityContext:
         privileged: true
@@ -177,7 +177,10 @@ spec:
         path: /var/lib/skadi-images
         type: DirectoryOrCreate
 EOF
-  kubectl -n skadi wait --for=condition=Ready "pod/import-${name}" --timeout=180s
+  if ! kubectl -n skadi wait --for=condition=Ready "pod/import-${name}" --timeout=180s; then
+    kubectl -n skadi describe "pod/import-${name}" >&2
+    exit 1
+  fi
   kubectl -n skadi cp "$tar" "import-${name}:/images/${name}.tar"
   kubectl -n skadi exec "import-${name}" -- nsenter -t 1 -m -u -i -n -p -- ctr -n k8s.io images import "/var/lib/skadi-images/${name}.tar"
   kubectl -n skadi exec "import-${name}" -- nsenter -t 1 -m -u -i -n -p -- rm -f "/var/lib/skadi-images/${name}.tar"
