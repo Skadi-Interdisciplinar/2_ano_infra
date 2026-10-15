@@ -9,8 +9,6 @@ resources:
   - frontend-service.yaml
   - ia-deployment.yaml
   - ia-service.yaml
-  - redis-deployment.yaml
-  - redis-service.yaml
 images:
   - name: skadi-backend
     newName: skadi-backend
