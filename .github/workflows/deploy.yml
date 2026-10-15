@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   deploy:
@@ -95,9 +94,7 @@ jobs:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: bash scripts/deploy.sh
 
-      - name: Abrir pull request com a tag das imagens
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Enviar a branch com a tag das imagens
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -110,4 +107,5 @@ jobs:
           git checkout -b "$branch"
           git commit -m "Publica as imagens do Skadi no Argo CD."
           git push -u origin "$branch"
-          gh pr create --base main --head "$branch" --title "Publica as imagens do Skadi" --body "Atualiza a tag das imagens para o Argo CD sincronizar."
+          echo "Branch pronta: $branch"
+          echo "Abra o pull request de $branch para a main."
