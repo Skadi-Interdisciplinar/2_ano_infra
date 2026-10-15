@@ -25,9 +25,6 @@ spec:
           envFrom:
             - secretRef:
                 name: skadi-backend
-          env:
-            - name: REDIS_URL
-              value: redis://skadi-redis:6379/0
           readinessProbe:
             tcpSocket:
               port: http

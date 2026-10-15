@@ -6,7 +6,7 @@ Este repositório empacota os artefatos já gerados pelo backend, pelo frontend 
 - Frontend: artefato `skadi_frontend` do repositório `Skadi-Interdisciplinar/2_ano_frontend` (build estática do Vite). O nginx serve o site, encaminha `/api/` para o Service `skadi-backend` e `/ia/` para o Service `skadi-ia`.
 - IA: artefato `python-dist` do repositório `Skadi-Interdisciplinar/2_ano_back_ia` (wheel Python 3.11). O container instala o wheel e sobe o uvicorn na porta 8000.
 
-O cluster fica na AWS Academy, região `us-east-1`. O Terraform cria a VPC e o EKS. Não há NAT Gateway: o nó `t3.medium` fica em sub-rede pública. O Postgres fica na Aiven, fora da AWS. O control plane do EKS cobra enquanto o cluster existir. Ao terminar a sessão, dispare o workflow **Infra** em `down`.
+O cluster fica na AWS Academy, região `us-east-1`. O Terraform cria a VPC e o EKS. Não há NAT Gateway: o nó `t3.medium` fica em sub-rede pública. Postgres e Redis ficam na Aiven. O Qdrant fica no serviço externo dele. O MongoDB fica no Atlas. Nenhum desses sobe na AWS. O control plane do EKS cobra enquanto o cluster existir. Ao terminar a sessão, dispare o workflow **Infra** em `desligar`.
 
 ## Credenciais
 
@@ -18,7 +18,7 @@ O download dos artefatos acontece no GitHub Actions. O secret `GH_PAT` precisa d
 
 O `.env` de cada aplicação existe só para rodar no seu PC. O cluster não lê esse arquivo. Os workflows de build do backend, do frontend e da IA também não usam secrets de senha. Tudo o que o pod precisa está nos repository secrets deste repositório `2_ano_infra`.
 
-A URL do Redis não é secret. O Deployment da API aponta para `redis://skadi-redis:6379/0`. O nome do stream e a retenção continuam com o padrão do `application.properties` do backend (`skadi:leituras:temperatura` e `72`).
+Redis, Qdrant e o MongoDB Atlas não sobem no cluster. A URL do Redis, com `rediss://`, entra no Secret da API e no Secret da IA. A URL e a chave do Qdrant, e a URI `mongodb+srv` do Atlas, entram só no Secret da IA. O nome do stream e a retenção continuam com o padrão do `application.properties` do backend (`skadi:leituras:temperatura` e `72`).
 
 ## O que sobe no cluster
 
@@ -26,16 +26,14 @@ No namespace `skadi`:
 
 | Recurso | Função |
 | --- | --- |
-| Deployment `skadi-backend` | Pod da API. `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `SECURITY_KEY` e `EXPIRATION_TIME` vêm do Secret `skadi-backend`. `REDIS_URL` aponta para o Redis do cluster. |
+| Deployment `skadi-backend` | Pod da API. `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `SECURITY_KEY`, `EXPIRATION_TIME` e `REDIS_URL` vêm do Secret `skadi-backend`. |
 | Service `skadi-backend` | ClusterIP na porta 8080. Só o frontend, dentro do cluster, fala com a API. |
-| Deployment `skadi-redis` | Redis 7, imagem pública `redis:7-alpine`. |
-| Service `skadi-redis` | ClusterIP na porta 6379. Só a API fala com ele. |
 | Deployment `skadi-frontend` | Pod do nginx com a build do React. |
 | Service `skadi-frontend` | LoadBalancer na porta 80. Este é o endereço público. |
-| Deployment `skadi-ia` | Pod do agente Python. O uvicorn procura `app` em `agente_ia.main`, `agente_ia.app` ou `agente_ia.api`. |
+| Deployment `skadi-ia` | Pod do agente Python. `REDIS_URL`, `QDRANT_URL`, `QDRANT_API_KEY` e `MONGODB_URI` vêm do Secret `skadi-ia`. |
 | Service `skadi-ia` | ClusterIP na porta 8000. O nginx encaminha `/ia/` para este Service. |
 
-O Secret real é criado pelo deploy com os secrets do GitHub, preenchidos a partir da Aiven. [k8s/backend-secret.example.yaml](k8s/backend-secret.example.yaml) mostra o formato, com valores mockados, e não entra no Kustomize.
+Os Secrets reais são criados pelo deploy com os secrets do GitHub. [k8s/backend-secret.example.yaml](k8s/backend-secret.example.yaml) e [k8s/ia-secret.example.yaml](k8s/ia-secret.example.yaml) mostram o formato, com valores mockados, e não entram no Kustomize.
 
 Quem aplica Deployment e Service é o Argo CD. A Application em [infra/argocd-application.yaml](infra/argocd-application.yaml) observa a pasta `k8s/` na `main` e sincroniza sozinha.
 
@@ -54,6 +52,10 @@ Cadastre estes secrets só no repositório `2_ano_infra`. Não cadastre os mesmo
 | `DB_PASSWORD` | Senha da Aiven |
 | `SECURITY_KEY` | Chave que você inventa para assinar o JWT |
 | `EXPIRATION_TIME` | `1800` |
+| `REDIS_URL` | Redis externo, URL `rediss://` da página de conexão |
+| `QDRANT_URL` | URL do Qdrant externo |
+| `QDRANT_API_KEY` | Chave do Qdrant externo |
+| `MONGODB_URI` | URI `mongodb+srv` do MongoDB Atlas |
 
 ## Criar a infra
 

@@ -88,6 +88,10 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SECURITY_KEY: ${{ secrets.SECURITY_KEY }}
           EXPIRATION_TIME: ${{ secrets.EXPIRATION_TIME }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: bash scripts/deploy.sh
 
       - name: Enviar o kustomization para o Argo CD sincronizar

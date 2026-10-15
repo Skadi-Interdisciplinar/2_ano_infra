@@ -77,11 +77,19 @@ DB_USERNAME_VALUE="${DB_USERNAME:-}"
 DB_PASSWORD_VALUE="${DB_PASSWORD:-}"
 SECURITY_KEY_VALUE="${SECURITY_KEY:-}"
 EXPIRATION_VALUE="${EXPIRATION_TIME:-3600}"
+REDIS_URL_VALUE="${REDIS_URL:-}"
+QDRANT_URL_VALUE="${QDRANT_URL:-}"
+QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
+MONGODB_URI_VALUE="${MONGODB_URI:-}"
 
 require_real DB_URL "$DB_URL_VALUE"
 require_real DB_USERNAME "$DB_USERNAME_VALUE"
 require_real DB_PASSWORD "$DB_PASSWORD_VALUE"
 require_real SECURITY_KEY "$SECURITY_KEY_VALUE"
+require_real REDIS_URL "$REDIS_URL_VALUE"
+require_real QDRANT_URL "$QDRANT_URL_VALUE"
+require_real QDRANT_API_KEY "$QDRANT_API_KEY_VALUE"
+require_real MONGODB_URI "$MONGODB_URI_VALUE"
 
 rm -rf "$CONTEXT_DIR"
 mkdir -p "$CONTEXT_DIR/backend" "$CONTEXT_DIR/frontend/dist" "$CONTEXT_DIR/ia/dist"
@@ -132,6 +140,13 @@ kubectl create secret generic skadi-backend --namespace skadi \
   --from-literal="DB_PASSWORD=${DB_PASSWORD_VALUE}" \
   --from-literal="SECURITY_KEY=${SECURITY_KEY_VALUE}" \
   --from-literal="EXPIRATION_TIME=${EXPIRATION_VALUE}" \
+  --from-literal="REDIS_URL=${REDIS_URL_VALUE}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic skadi-ia --namespace skadi \
+  --from-literal="REDIS_URL=${REDIS_URL_VALUE}" \
+  --from-literal="QDRANT_URL=${QDRANT_URL_VALUE}" \
+  --from-literal="QDRANT_API_KEY=${QDRANT_API_KEY_VALUE}" \
+  --from-literal="MONGODB_URI=${MONGODB_URI_VALUE}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 import_image() {
@@ -185,8 +200,6 @@ resources:
   - frontend-service.yaml
   - ia-deployment.yaml
   - ia-service.yaml
-  - redis-deployment.yaml
-  - redis-service.yaml
 images:
   - name: skadi-backend
     newName: skadi-backend
