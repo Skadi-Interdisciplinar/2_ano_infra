@@ -81,6 +81,9 @@ REDIS_URL_VALUE="${REDIS_URL:-}"
 QDRANT_URL_VALUE="${QDRANT_URL:-}"
 QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
 MONGODB_URI_VALUE="${MONGODB_URI:-}"
+DATABASE_URL_VALUE="${DATABASE_URL:-}"
+GEMINI_API_KEY_VALUE="${GEMINI_API_KEY:-}"
+GROQ_API_KEY_VALUE="${GROQ_API_KEY:-}"
 
 require_real DB_URL "$DB_URL_VALUE"
 require_real DB_USERNAME "$DB_USERNAME_VALUE"
@@ -90,6 +93,9 @@ require_real REDIS_URL "$REDIS_URL_VALUE"
 require_real QDRANT_URL "$QDRANT_URL_VALUE"
 require_real QDRANT_API_KEY "$QDRANT_API_KEY_VALUE"
 require_real MONGODB_URI "$MONGODB_URI_VALUE"
+require_real DATABASE_URL "$DATABASE_URL_VALUE"
+require_real GEMINI_API_KEY "$GEMINI_API_KEY_VALUE"
+require_real GROQ_API_KEY "$GROQ_API_KEY_VALUE"
 
 rm -rf "$CONTEXT_DIR"
 mkdir -p "$CONTEXT_DIR/backend" "$CONTEXT_DIR/frontend/dist" "$CONTEXT_DIR/ia/dist"
@@ -157,7 +163,12 @@ kubectl create secret generic skadi-ia --namespace skadi \
   --from-literal="QDRANT_URL=${QDRANT_URL_VALUE}" \
   --from-literal="QDRANT_API_KEY=${QDRANT_API_KEY_VALUE}" \
   --from-literal="MONGODB_URI=${MONGODB_URI_VALUE}" \
+  --from-literal="DATABASE_URL=${DATABASE_URL_VALUE}" \
+  --from-literal="SECURITY_KEY=${SECURITY_KEY_VALUE}" \
+  --from-literal="GEMINI_API_KEY=${GEMINI_API_KEY_VALUE}" \
+  --from-literal="GROQ_API_KEY=${GROQ_API_KEY_VALUE}" \
   --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n skadi rollout restart deployment/skadi-ia || true
 
 import_image() {
   local name="$1"
