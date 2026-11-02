@@ -113,6 +113,77 @@ delete_load_balancers() {
   return 1
 }
 
+# Security groups do EKS e do balanceador nao estao no Terraform e seguram a VPC.
+release_vpc_leftovers() {
+  local vpc_id="$1" igw subnet rt assoc sg nacl ep ingress egress pass left
+  for ep in $(aws ec2 describe-vpc-endpoints --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query "VpcEndpoints[].VpcEndpointId" --output text); do
+    [[ -z "$ep" || "$ep" == "None" ]] && continue
+    aws ec2 delete-vpc-endpoints --region "$REGION" --vpc-endpoint-ids "$ep" || true
+  done
+  for igw in $(aws ec2 describe-internet-gateways --region "$REGION" \
+    --filters "Name=attachment.vpc-id,Values=${vpc_id}" \
+    --query "InternetGateways[].InternetGatewayId" --output text); do
+    [[ -z "$igw" || "$igw" == "None" ]] && continue
+    aws ec2 detach-internet-gateway --region "$REGION" --internet-gateway-id "$igw" --vpc-id "$vpc_id" || true
+    aws ec2 delete-internet-gateway --region "$REGION" --internet-gateway-id "$igw" || true
+  done
+  for subnet in $(aws ec2 describe-subnets --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query "Subnets[].SubnetId" --output text); do
+    [[ -z "$subnet" || "$subnet" == "None" ]] && continue
+    aws ec2 delete-subnet --region "$REGION" --subnet-id "$subnet" || true
+  done
+  for assoc in $(aws ec2 describe-route-tables --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query 'RouteTables[].Associations[?Main==`false`].RouteTableAssociationId' --output text); do
+    [[ -z "$assoc" || "$assoc" == "None" ]] && continue
+    aws ec2 disassociate-route-table --region "$REGION" --association-id "$assoc" || true
+  done
+  local main_rt
+  main_rt="$(aws ec2 describe-route-tables --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" "Name=association.main,Values=true" \
+    --query "RouteTables[0].RouteTableId" --output text || true)"
+  for rt in $(aws ec2 describe-route-tables --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query "RouteTables[].RouteTableId" --output text); do
+    [[ -z "$rt" || "$rt" == "None" || "$rt" == "$main_rt" ]] && continue
+    aws ec2 delete-route-table --region "$REGION" --route-table-id "$rt" || true
+  done
+  for nacl in $(aws ec2 describe-network-acls --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' --output text); do
+    [[ -z "$nacl" || "$nacl" == "None" ]] && continue
+    aws ec2 delete-network-acl --region "$REGION" --network-acl-id "$nacl" || true
+  done
+  for pass in 1 2 3; do
+    for sg in $(aws ec2 describe-security-groups --region "$REGION" \
+      --filters "Name=vpc-id,Values=${vpc_id}" \
+      --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do
+      [[ -z "$sg" || "$sg" == "None" ]] && continue
+      ingress="$(aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg" \
+        --query "SecurityGroups[0].IpPermissions" --output json 2>/dev/null || echo '[]')"
+      egress="$(aws ec2 describe-security-groups --region "$REGION" --group-ids "$sg" \
+        --query "SecurityGroups[0].IpPermissionsEgress" --output json 2>/dev/null || echo '[]')"
+      if [[ "$ingress" != "[]" && "$ingress" != "null" ]]; then
+        aws ec2 revoke-security-group-ingress --region "$REGION" --group-id "$sg" --ip-permissions "$ingress" || true
+      fi
+      if [[ "$egress" != "[]" && "$egress" != "null" ]]; then
+        aws ec2 revoke-security-group-egress --region "$REGION" --group-id "$sg" --ip-permissions "$egress" || true
+      fi
+      aws ec2 delete-security-group --region "$REGION" --group-id "$sg" || true
+    done
+  done
+  left="$(aws ec2 describe-security-groups --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query 'length(SecurityGroups[?GroupName!=`default`])' --output text || echo 1)"
+  if [[ "$left" != "0" ]]; then
+    echo "A VPC ${vpc_id} ainda tem security group fora do Terraform." >&2
+    return 1
+  fi
+}
+
 # Depois que o cluster some, ENIs soltas ainda impedem o DeleteSubnet.
 drain_vpc() {
   local vpc_id="$1" attempt instances eni attachment
@@ -129,7 +200,8 @@ drain_vpc() {
       --filters "Name=vpc-id,Values=${vpc_id}" \
       --query "NetworkInterfaces[].NetworkInterfaceId" --output text || true)"
     if [[ -z "$enis" || "$enis" == "None" ]]; then
-      return 0
+      release_vpc_leftovers "$vpc_id"
+      return $?
     fi
     echo "Aguardando ENIs da VPC sairem (${attempt}): ${enis}"
     for eni in $enis; do
