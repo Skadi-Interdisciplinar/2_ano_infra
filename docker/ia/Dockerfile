@@ -1,9 +1,9 @@
 FROM python:3.11-slim
 WORKDIR /app
-COPY dist/ /tmp/dist/
-COPY start.py /app/start.py
+COPY requirements.txt /tmp/requirements.txt
+COPY app /app/app
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir /tmp/dist/*.whl \
-    && rm -rf /tmp/dist
+    && pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 EXPOSE 8000
-CMD ["python", "/app/start.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -106,6 +106,10 @@ jobs:
           branch="deploy/skadi-${{ github.run_id }}"
           git checkout -b "$branch"
           git commit -m "Publica as imagens do Skadi no Argo CD."
-          git push -u origin "$branch"
+          if git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"; then
+            git push --force-with-lease="refs/heads/$branch:refs/remotes/origin/$branch" origin "HEAD:$branch"
+          else
+            git push -u origin "$branch"
+          fi
           echo "Branch pronta: $branch"
           echo "Abra o pull request de $branch para a main."
