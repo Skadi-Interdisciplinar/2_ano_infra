@@ -78,31 +78,44 @@ ligar() {
   echo "Infra pronta. O Argo CD observa k8s/ na branch main."
 }
 
-release_vpc() {
-  local vpc_id lbs clbs instances enis eni igw subnet sg rt main_rt nat ep
-  vpc_id="$(aws ec2 describe-vpcs --region "$REGION" \
+vpc_id() {
+  aws ec2 describe-vpcs --region "$REGION" \
     --filters "Name=tag:Name,Values=${CLUSTER_NAME}" \
-    --query "Vpcs[0].VpcId" --output text)"
-  if [[ -z "$vpc_id" || "$vpc_id" == "None" ]]; then
-    return 0
-  fi
+    --query "Vpcs[0].VpcId" --output text 2>/dev/null || true
+}
 
-  aws eks delete-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name "$CLUSTER_NAME" --region "$REGION" || true
-  aws eks delete-cluster --name "$CLUSTER_NAME" --region "$REGION" || true
-  aws eks wait cluster-deleted --name "$CLUSTER_NAME" --region "$REGION" || true
-
+# O Service LoadBalancer cria um ELB fora do Terraform. A ENI dele segura a subnet.
+delete_load_balancers() {
+  local vpc_id="$1" lb name attempt left cleft
+  local lbs clbs
   lbs="$(aws elbv2 describe-load-balancers --region "$REGION" \
     --query "LoadBalancers[?VpcId=='${vpc_id}'].LoadBalancerArn" --output text || true)"
   for lb in $lbs; do
     aws elbv2 delete-load-balancer --region "$REGION" --load-balancer-arn "$lb" || true
   done
-
   clbs="$(aws elb describe-load-balancers --region "$REGION" \
     --query "LoadBalancerDescriptions[?VPCId=='${vpc_id}'].LoadBalancerName" --output text || true)"
   for name in $clbs; do
     aws elb delete-load-balancer --region "$REGION" --load-balancer-name "$name" || true
   done
+  for attempt in $(seq 1 30); do
+    left="$(aws elbv2 describe-load-balancers --region "$REGION" \
+      --query "length(LoadBalancers[?VpcId=='${vpc_id}'])" --output text || echo 1)"
+    cleft="$(aws elb describe-load-balancers --region "$REGION" \
+      --query "length(LoadBalancerDescriptions[?VPCId=='${vpc_id}'])" --output text || echo 1)"
+    if [[ "$left" == "0" && "$cleft" == "0" ]]; then
+      return 0
+    fi
+    echo "Aguardando o balanceador sair da VPC (${attempt})."
+    sleep 10
+  done
+  echo "O balanceador da VPC ${vpc_id} nao terminou de sair." >&2
+  return 1
+}
 
+# Depois que o cluster some, ENIs soltas ainda impedem o DeleteSubnet.
+drain_vpc() {
+  local vpc_id="$1" attempt instances eni attachment
   instances="$(aws ec2 describe-instances --region "$REGION" \
     --filters "Name=vpc-id,Values=${vpc_id}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
     --query "Reservations[].Instances[].InstanceId" --output text || true)"
@@ -110,62 +123,47 @@ release_vpc() {
     aws ec2 terminate-instances --region "$REGION" --instance-ids $instances || true
     aws ec2 wait instance-terminated --region "$REGION" --instance-ids $instances || true
   fi
-
-  for nat in $(aws ec2 describe-nat-gateways --region "$REGION" \
-    --filter "Name=vpc-id,Values=${vpc_id}" "Name=state,Values=pending,available" \
-    --query "NatGateways[].NatGatewayId" --output text); do
-    aws ec2 delete-nat-gateway --region "$REGION" --nat-gateway-id "$nat" || true
-  done
-
-  for ep in $(aws ec2 describe-vpc-endpoints --region "$REGION" \
-    --filters "Name=vpc-id,Values=${vpc_id}" \
-    --query "VpcEndpoints[].VpcEndpointId" --output text); do
-    aws ec2 delete-vpc-endpoints --region "$REGION" --vpc-endpoint-ids "$ep" || true
-  done
-
-  for eni in $(aws ec2 describe-network-interfaces --region "$REGION" \
-    --filters "Name=vpc-id,Values=${vpc_id}" \
-    --query "NetworkInterfaces[].NetworkInterfaceId" --output text); do
-    aws ec2 delete-network-interface --region "$REGION" --network-interface-id "$eni" || true
-  done
-
-  for igw in $(aws ec2 describe-internet-gateways --region "$REGION" \
-    --filters "Name=attachment.vpc-id,Values=${vpc_id}" \
-    --query "InternetGateways[].InternetGatewayId" --output text); do
-    aws ec2 detach-internet-gateway --region "$REGION" --internet-gateway-id "$igw" --vpc-id "$vpc_id" || true
-    aws ec2 delete-internet-gateway --region "$REGION" --internet-gateway-id "$igw" || true
-  done
-
-  for subnet in $(aws ec2 describe-subnets --region "$REGION" \
-    --filters "Name=vpc-id,Values=${vpc_id}" \
-    --query "Subnets[].SubnetId" --output text); do
-    aws ec2 delete-subnet --region "$REGION" --subnet-id "$subnet" || true
-  done
-
-  main_rt="$(aws ec2 describe-route-tables --region "$REGION" \
-    --filters "Name=vpc-id,Values=${vpc_id}" "Name=association.main,Values=true" \
-    --query "RouteTables[0].RouteTableId" --output text)"
-  for rt in $(aws ec2 describe-route-tables --region "$REGION" \
-    --filters "Name=vpc-id,Values=${vpc_id}" \
-    --query "RouteTables[].RouteTableId" --output text); do
-    if [[ "$rt" != "$main_rt" ]]; then
-      aws ec2 delete-route-table --region "$REGION" --route-table-id "$rt" || true
-    fi
-  done
-
-  for _ in 1 2; do
-    for sg in $(aws ec2 describe-security-groups --region "$REGION" \
+  for attempt in $(seq 1 24); do
+    local enis
+    enis="$(aws ec2 describe-network-interfaces --region "$REGION" \
       --filters "Name=vpc-id,Values=${vpc_id}" \
-      --query "SecurityGroups[?GroupName!='default'].GroupId" --output text); do
-      aws ec2 delete-security-group --region "$REGION" --group-id "$sg" || true
+      --query "NetworkInterfaces[].NetworkInterfaceId" --output text || true)"
+    if [[ -z "$enis" || "$enis" == "None" ]]; then
+      return 0
+    fi
+    echo "Aguardando ENIs da VPC sairem (${attempt}): ${enis}"
+    for eni in $enis; do
+      attachment="$(aws ec2 describe-network-interfaces --region "$REGION" \
+        --network-interface-ids "$eni" \
+        --query "NetworkInterfaces[0].Attachment.AttachmentId" --output text 2>/dev/null || true)"
+      if [[ -n "$attachment" && "$attachment" != "None" ]]; then
+        aws ec2 detach-network-interface --region "$REGION" --attachment-id "$attachment" --force || true
+      fi
+      aws ec2 delete-network-interface --region "$REGION" --network-interface-id "$eni" || true
     done
+    sleep 15
   done
+  echo "A subnet continua com ENI. O destroy nao consegue apaga-la." >&2
+  aws ec2 describe-network-interfaces --region "$REGION" \
+    --filters "Name=vpc-id,Values=${vpc_id}" \
+    --query "NetworkInterfaces[].{Id:NetworkInterfaceId,Status:Status,Subnet:SubnetId,Desc:Description}" \
+    --output table >&2 || true
+  return 1
 }
 
 desligar() {
+  local vpc
   ensure_state_bucket
   terraform_init
-  release_vpc
+  vpc="$(vpc_id)"
+  if [[ -n "$vpc" && "$vpc" != "None" ]]; then
+    delete_load_balancers "$vpc"
+  fi
+  terraform -chdir="$ROOT/terraform" destroy -input=false -auto-approve -target=aws_eks_cluster.this
+  vpc="$(vpc_id)"
+  if [[ -n "$vpc" && "$vpc" != "None" ]]; then
+    drain_vpc "$vpc"
+  fi
   terraform -chdir="$ROOT/terraform" destroy -input=false -auto-approve
   aws s3 rm "s3://${BUCKET}" --recursive
   aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"

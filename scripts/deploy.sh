@@ -121,16 +121,16 @@ if [[ -z "$WHEEL" ]]; then
   echo "Nenhum .whl encontrado no artefato $IA_ARTIFACT." >&2
   exit 1
 fi
-# A wheel so empacota src/agente_ia, que nao tem o FastAPI. O app real esta em app/main.py.
+# O requirements.txt da main e so "-e .[dev]". As dependencias estao no pyproject.toml.
 ia_source="$(mktemp -d)"
 curl -fsSL "https://codeload.github.com/${IA_REPO}/tar.gz/refs/heads/main" \
   | tar -xz -C "$ia_source" --strip-components=1
-if [[ ! -f "$ia_source/app/main.py" || ! -f "$ia_source/requirements.txt" ]]; then
-  echo "O codigo da IA nao trouxe app/main.py ou requirements.txt." >&2
+if [[ ! -f "$ia_source/app/main.py" || ! -f "$ia_source/pyproject.toml" ]]; then
+  echo "O codigo da IA nao trouxe app/main.py ou pyproject.toml." >&2
   exit 1
 fi
 cp -a "$ia_source/app" "$CONTEXT_DIR/ia/app"
-cp "$ia_source/requirements.txt" "$CONTEXT_DIR/ia/requirements.txt"
+cp "$ia_source/pyproject.toml" "$CONTEXT_DIR/ia/pyproject.toml"
 rm -rf "$ia_source"
 
 docker build -f "$ROOT/docker/backend/Dockerfile" -t "$BACKEND_IMAGE" "$CONTEXT_DIR/backend"
