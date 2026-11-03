@@ -78,6 +78,7 @@ DB_PASSWORD_VALUE="${DB_PASSWORD:-}"
 SECURITY_KEY_VALUE="${SECURITY_KEY:-}"
 EXPIRATION_VALUE="${EXPIRATION_TIME:-3600}"
 REDIS_URL_VALUE="${REDIS_URL:-}"
+MAIL_PASSWORD_VALUE="${MAIL_PASSWORD:-}"
 QDRANT_URL_VALUE="${QDRANT_URL:-}"
 QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
 MONGODB_URI_VALUE="${MONGODB_URI:-}"
@@ -89,6 +90,7 @@ require_real DB_USERNAME "$DB_USERNAME_VALUE"
 require_real DB_PASSWORD "$DB_PASSWORD_VALUE"
 require_real SECURITY_KEY "$SECURITY_KEY_VALUE"
 require_real REDIS_URL "$REDIS_URL_VALUE"
+require_real MAIL_PASSWORD "$MAIL_PASSWORD_VALUE"
 require_real QDRANT_URL "$QDRANT_URL_VALUE"
 require_real QDRANT_API_KEY "$QDRANT_API_KEY_VALUE"
 require_real MONGODB_URI "$MONGODB_URI_VALUE"
@@ -155,7 +157,9 @@ kubectl create secret generic skadi-backend --namespace skadi \
   --from-literal="SECURITY_KEY=${SECURITY_KEY_VALUE}" \
   --from-literal="EXPIRATION_TIME=${EXPIRATION_VALUE}" \
   --from-literal="REDIS_URL=${REDIS_URL_VALUE}" \
+  --from-literal="MAIL_PASSWORD=${MAIL_PASSWORD_VALUE}" \
   --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n skadi rollout restart deployment/skadi-backend || true
 kubectl create secret generic skadi-ia --namespace skadi \
   --from-literal="REDIS_URL=${REDIS_URL_VALUE}" \
   --from-literal="QDRANT_URL=${QDRANT_URL_VALUE}" \
