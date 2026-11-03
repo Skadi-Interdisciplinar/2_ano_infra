@@ -73,6 +73,7 @@ FRONTEND_IMAGE="skadi-frontend:${TAG}"
 IA_IMAGE="skadi-ia:${TAG}"
 
 DB_URL_VALUE="${DB_URL:-}"
+DB_URL_PSYCOPG_VALUE="${DB_URL_PSYCOPG:-}"
 DB_USERNAME_VALUE="${DB_USERNAME:-}"
 DB_PASSWORD_VALUE="${DB_PASSWORD:-}"
 SECURITY_KEY_VALUE="${SECURITY_KEY:-}"
@@ -86,6 +87,7 @@ GEMINI_API_KEY_VALUE="${GEMINI_API_KEY:-}"
 GROQ_API_KEY_VALUE="${GROQ_API_KEY:-}"
 
 require_real DB_URL "$DB_URL_VALUE"
+require_real DB_URL_PSYCOPG "$DB_URL_PSYCOPG_VALUE"
 require_real DB_USERNAME "$DB_USERNAME_VALUE"
 require_real DB_PASSWORD "$DB_PASSWORD_VALUE"
 require_real SECURITY_KEY "$SECURITY_KEY_VALUE"
@@ -161,6 +163,7 @@ kubectl create secret generic skadi-backend --namespace skadi \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n skadi rollout restart deployment/skadi-backend || true
 kubectl create secret generic skadi-ia --namespace skadi \
+  --from-literal="DB_URL_PSYCOPG=${DB_URL_PSYCOPG_VALUE}" \
   --from-literal="REDIS_URL=${REDIS_URL_VALUE}" \
   --from-literal="QDRANT_URL=${QDRANT_URL_VALUE}" \
   --from-literal="QDRANT_API_KEY=${QDRANT_API_KEY_VALUE}" \

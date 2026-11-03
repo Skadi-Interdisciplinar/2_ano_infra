@@ -84,6 +84,7 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
           CLUSTER_NAME_OVERRIDE: skadi
           DB_URL: ${{ secrets.DB_URL }}
+          DB_URL_PSYCOPG: ${{ secrets.DB_URL_PSYCOPG }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SECURITY_KEY: ${{ secrets.SECURITY_KEY }}
